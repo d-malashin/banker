@@ -1,5 +1,7 @@
 # Banker
 
+[Open Banker](https://d-malashin.github.io/banker/) · [Source repository](https://github.com/d-malashin/banker)
+
 A mobile-first, local-only cashback cabinet with a frosted-glass interface. Upload a screenshot of a Russian bank's cashback page, recognize its bank and categories on your own device, review the result, and save it. Russian browser locales get Russian interface text; other locales get English.
 
 ## Run locally
