@@ -10,6 +10,9 @@ export const BANKS = [
   { id: 'psb', name: 'ПСБ', color: '#ee7f45', mark: 'П', aliases: ['псб', 'промсвязьбанк', 'psb'] },
   { id: 'mts', name: 'МТС Банк', color: '#e84a5f', mark: 'М', aliases: ['мтс банк', 'мтс-банк', 'мтсбанк', 'mts bank'] },
   { id: 'sovcom', name: 'Совкомбанк', color: '#e84e63', mark: 'Х', aliases: ['совкомбанк', 'совком банк', 'халва', 'sovcombank'] },
+  { id: 'rshb', name: 'Россельхозбанк', color: '#16913d', mark: 'Р', aliases: ['россельхозбанк', 'россельхоз', 'рсхб', 'rshb'] },
+  { id: 'domrf', name: 'Банк ДОМ.РФ', color: '#8dcc24', mark: 'Д', aliases: ['банк дом.рф', 'дом.рф', 'дом рф', 'domrf', 'dom rf'] },
+  { id: 'mkb', name: 'Московский кредитный банк', color: '#bd1639', mark: 'М', aliases: ['московский кредитный банк', 'мкб', 'mkb'] },
 ];
 
 const MAX_BANKS = 40;
@@ -114,6 +117,17 @@ export function validateData(input) {
     return { id, name: bank.name.trim(), categories, updatedAt: new Date(bank.updatedAt).toISOString() };
   });
   return { version: 1, banks };
+}
+
+export function restoreStoredData(input) {
+  if (!input || typeof input !== 'object' || input.version !== 1 || !Array.isArray(input.banks) || input.banks.length > MAX_BANKS) throw new Error('Invalid Banker data');
+  const selected = new Map();
+  for (const value of input.banks) {
+    const bank = validateData({ version: input.version, banks: [value] }).banks[0];
+    const previous = selected.get(bank.id);
+    if (!previous || Date.parse(bank.updatedAt) >= Date.parse(previous.updatedAt)) selected.set(bank.id, bank);
+  }
+  return validateData({ version: 1, banks: [...selected.values()] });
 }
 
 export function mergeBanks(current, incoming) {

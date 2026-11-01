@@ -53,3 +53,9 @@ The frontend registers `sw.js` relative to its page URL. Its service worker post
 - [Tesseract fast language models](https://github.com/tesseract-ocr/tessdata_fast): Apache-2.0; English and Russian models at revision `87416418657359cb625c412a48b6e1d6d41c29bd`.
 - [Lucide](https://lucide.dev/): ISC icon library.
 - Vite and Sharp are build-time tools and are not OCR services.
+
+## Appearance, bank marks and personal settings
+
+Banker uses a neutral gray canvas, translucent white controls, and small colored category/summary accents. Settings includes an optional display name that personalizes the greeting. It is stored separately on the current device and is excluded from JSON exports and shared links; leaving it blank restores the default greeting.
+
+Ten locally bundled bank marks identify Sber, VTB, Gazprombank, Alfa-Bank, PSB, Rosselkhozbank, T-Bank, Bank DOM.RF, MKB, and Sovcombank. Selection follows the Interfax-100 Q3 2026 asset ranking, not a reliability recommendation. Original asset URLs, attribution, transformations, and file hashes are recorded in [public/banks/sources.json](public/banks/sources.json). The marks are served with the app and precached for offline use; no third-party logo service is contacted by the browser. Other supported or custom banks retain a letter badge.

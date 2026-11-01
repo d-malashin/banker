@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BANKS, recognizeBank, makeBankId, parseScreenshot, validateData, mergeBanks, encodeShare, decodeShare } from './domain.js';
+import { BANKS, recognizeBank, makeBankId, parseScreenshot, validateData, restoreStoredData, mergeBanks, encodeShare, decodeShare } from './domain.js';
 
 const category = (name = 'Супермаркеты', rate = 5) => ({ id: 'one', name, rate });
 const bank = (name = 'Т-Банк', categories = [category()]) => ({ id: makeBankId(name), name, categories, updatedAt: '2026-10-31T10:00:00.000Z' });
@@ -17,6 +17,73 @@ test('recognizes Russian bank aliases and canonical identity', () => {
 test('custom banks normalize whitespace, case and punctuation', () => {
   assert.equal(makeBankId(' Мой  Банк '), makeBankId('мой-банк'));
   assert.throws(() => makeBankId('!!!'));
+});
+
+test('recognizes added banks through each Cyrillic and Latin alias', () => {
+  for (const id of ['rshb', 'domrf', 'mkb']) {
+    const entry = BANKS.find((item) => item.id === id);
+    for (const alias of entry.aliases) {
+      assert.equal(recognizeBank(`Кешбэк\n${alias.toUpperCase()}\nАптеки 5%`)?.id, id, alias);
+      assert.equal(makeBankId(alias), id, alias);
+    }
+  }
+  assert.equal(recognizeBank('Дом не банк'), null);
+  assert.equal(recognizeBank('мкбонус'), null);
+});
+
+test('old custom bank identities migrate without losing stored categories', () => {
+  const oldBanks = [
+    { ...bank('Россельхозбанк', [category('Аптеки', 7)]), id: 'custom-россельхозбанк' },
+    { ...bank('Банк ДОМ.РФ', [category('Рестораны', 10)]), id: 'custom-банк-дом-рф' },
+    { ...bank('Московский кредитный банк', [category('Такси', 5)]), id: 'custom-московский-кредитный-банк' },
+  ];
+  const migrated = validateData({ version: 1, banks: oldBanks }).banks;
+  assert.deepEqual(migrated.map((entry) => entry.id), ['rshb', 'domrf', 'mkb']);
+  for (let i = 0; i < oldBanks.length; i++) {
+    assert.deepEqual(migrated[i].categories, oldBanks[i].categories);
+    assert.equal(migrated[i].updatedAt, oldBanks[i].updatedAt);
+  }
+  for (const [i, alias] of ['РСХБ', 'ДОМ РФ', 'МКБ'].entries()) {
+    const updated = mergeBanks(oldBanks, [bank(alias, [category('Новые категории', 12)])]);
+    assert.equal(updated.length, oldBanks.length);
+    assert.deepEqual(updated[i].categories, [category('Новые категории', 12)]);
+    for (let j = 0; j < oldBanks.length; j++) {
+      if (j !== i) assert.deepEqual(updated[j].categories, oldBanks[j].categories);
+    }
+  }
+  assert.deepEqual(oldBanks.map((entry) => entry.id), ['custom-россельхозбанк', 'custom-банк-дом-рф', 'custom-московский-кредитный-банк']);
+});
+
+test('local restore resolves legacy bank aliases by newest complete list', () => {
+  const older = '2026-10-01T10:00:00.000Z';
+  const newer = '2026-10-31T10:00:00.000Z';
+  const domOld = { ...bank('Банк ДОМ.РФ', [category('Старые аптеки', 3)]), id: 'custom-банк-дом-рф', updatedAt: older };
+  const domNew = { ...bank('ДОМ РФ', [category('Новые аптеки', 7)]), id: 'custom-дом-рф', updatedAt: newer };
+  const rshbOld = { ...bank('Россельхозбанк', [category('Старое такси', 5)]), id: 'custom-россельхозбанк', updatedAt: older };
+  const rshbNew = { ...bank('РСХБ', [category('Новые рестораны', 10)]), id: 'custom-рсхб', updatedAt: newer };
+  const unrelated = bank('Сбер');
+  const input = { version: 1, banks: [domOld, domNew, unrelated, rshbNew, rshbOld] };
+  const restored = restoreStoredData(input);
+  assert.deepEqual(restored.banks.map((entry) => entry.id), ['domrf', 'sber', 'rshb']);
+  assert.deepEqual(restored.banks[0].categories, domNew.categories);
+  assert.deepEqual(restored.banks[1], unrelated);
+  assert.deepEqual(restored.banks[2].categories, rshbNew.categories);
+  assert.equal(restored.banks[0].updatedAt, newer);
+  assert.equal(input.banks[0].id, 'custom-банк-дом-рф');
+  assert.throws(() => validateData(input), /Duplicate bank/);
+  const tie = restoreStoredData({ version: 1, banks: [domNew, { ...domOld, updatedAt: newer }] });
+  assert.deepEqual(tie.banks[0].categories, domOld.categories);
+});
+
+test('local restore validates older duplicates and full collection limits', () => {
+  const valid = bank('ДОМ РФ');
+  const invalidOld = { ...bank('Банк ДОМ.РФ', [category('Аптеки', -1)]), updatedAt: '2026-10-01T10:00:00.000Z' };
+  assert.throws(() => restoreStoredData({ version: 1, banks: [invalidOld, valid] }), /Invalid category/);
+  assert.throws(() => restoreStoredData({ version: 1, banks: [valid, invalidOld] }), /Invalid category/);
+  for (const input of [null, {}, { version: 2, banks: [] }, { version: 1, banks: 'oops' }, { version: 1, banks: Array.from({ length: 41 }, () => valid) }]) assert.throws(() => restoreStoredData(input));
+  const manyCategories = Array.from({ length: 100 }, (_, i) => ({ id: String(i), name: `Категория ${i}`, rate: 5 }));
+  const tooLarge = Array.from({ length: 6 }, (_, i) => bank(`Свой банк ${i}`, manyCategories));
+  assert.throws(() => restoreStoredData({ version: 1, banks: tooLarge }), /Invalid category/);
 });
 
 test('OCR parses inline Russian categories and decimal rates', () => {

@@ -1,5 +1,21 @@
 # Banker
 
+## Neutral glass redesign, bank logos, and settings
+
+- [x] Source and bundle actual logos for ten leading Russian banks, with attribution.
+- [x] Replace the green palette with neutral gray Liquid Glass surfaces and restrained Reminders-like accents.
+- [x] Add bilingual settings with an optional name saved only on the current device.
+- [x] Verify mobile/desktop layout, settings persistence/privacy, bank logos and offline assets.
+- [ ] Push and deploy the update to GitHub Pages; check the live site.
+
+Design direction: light gray canvas, translucent white rounded surfaces, black/gray text, bright small category accents, and glass navigation/actions. Keep the existing local-only OCR and data transfer behavior.
+
+### Redesign verification
+
+15 domain tests pass, including newly supported bank aliases and safe migration of previously custom names. Actual marks for the ten largest banks by assets in the Interfax Q3 2026 ranking are bundled with provenance in `public/banks/sources.json`. Added canonical recognition for Россельхозбанк, ДОМ.РФ, and МКБ; all previous banks remain supported.
+
+Isolated Chromium checks verified neutral colors, populated mobile and desktop screens, all ten loaded logos, no horizontal overflow at 320/390/1440px, Russian and English settings, name persistence/clearing, escaped name rendering, and exclusion of the name from actual exported JSON and decoded share payloads. Fresh-context offline checks confirmed all ten logos and Russian screenshot OCR. Profile fields use 16px text on mobile to avoid Safari focus zoom. Real iOS material rendering and home-screen installation remain device checks.
+
 - [x] Build mobile-first bilingual glass UI and screenshot review flow.
 - [x] Implement local OCR, stable bank replacement, validated JSON import/export and URL-fragment sharing.
 - [x] Add offline PWA assets, iOS installation guidance, and GitHub Pages deployment workflow.
