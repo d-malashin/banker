@@ -4,7 +4,9 @@
 
 - [x] Make bank-recognition notices conditional on screenshot-origin review and preserve the origin when returning from replacement confirmation.
 - [x] Verify manual bank selection and screenshot warnings independently.
-- [ ] Push and deploy the correction.
+- [x] Push and deploy the correction.
+
+Verified locally that manual entry has no bank-detection or missing-category notices, choosing a bank works without errors, and the unbranded screenshot still shows the expected warning. Commit `f46a5d1` deployed successfully in run `41446416900`; live manual-entry check confirmed the warning is absent.
 
 ## Real screenshot OCR, locale bank catalogs, and monthly history
 
