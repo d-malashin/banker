@@ -966,15 +966,15 @@ function showInstall() {
   );
   $("#got-it").onclick = () => $("#modal").close();
 }
-function showReview(result, raw = "") {
+function showReview(result, raw = "", { fromScreenshot = false } = {}) {
   let categories = result.categories.map((category) => ({ ...category }));
   if (!categories.length) categories = [{ id: uid(), name: "", rate: "" }];
   const uploadMonth = result.month || defaultUploadMonth();
   const suggested = result.bankSource === "layout";
-  dialog(`<span class="section-kicker">${ru ? "ПЕРЕД СОХРАНЕНИЕМ" : "BEFORE YOU SAVE"}</span><h2>${t.review}</h2><p>${t.reviewSub}</p>
+  dialog(`<span class="section-kicker">${ru ? "ПЕРЕД СОХРАНЕНИЕМ" : "BEFORE YOU SAVE"}</span><h2>${fromScreenshot ? t.review : t.manual}</h2><p>${fromScreenshot ? t.reviewSub : ru ? "Выберите банк и месяц, затем добавьте категории кешбэка." : "Choose a bank and month, then add your cashback categories."}</p>
   <form id="review-form">
    <label class="field">${t.bank}<input id="bank-name" list="banks-list" maxlength="80" required placeholder="${t.bankPlaceholder}" value="${esc(result.bank?.name || "")}"><datalist id="banks-list">${suggestedBanks.map((bank) => `<option value="${esc(bank.name)}"></option>`).join("")}</datalist></label>
-   <p class="bank-detection-note ${result.bank ? "" : "bank-needs-choice"}">${result.bank ? (suggested ? t.bankSuggested : t.bankDetected) : t.bankUnknown}</p>
+   ${fromScreenshot ? `<p class="bank-detection-note ${result.bank ? "" : "bank-needs-choice"}">${result.bank ? (suggested ? t.bankSuggested : t.bankDetected) : t.bankUnknown}</p>` : ""}
    <div class="bank-picker" aria-label="${t.bankPicker}">${suggestedBanks
      .slice(0, 10)
      .map(
@@ -984,7 +984,7 @@ function showReview(result, raw = "") {
      .join("")}</div>
    <label class="field month-field">${t.uploadMonth}<input type="month" id="upload-month" required value="${esc(uploadMonth)}" aria-label="${t.uploadMonth}"></label>
    <p class="field-hint">${t.monthHint}</p>
-   ${!result.categories.length ? `<p class="field-hint">${t.noCategories}</p>` : ""}
+   ${fromScreenshot && !result.categories.length ? `<p class="field-hint">${t.noCategories}</p>` : ""}
    <div class="review-labels"><span>${t.category}</span><span>${t.rate}</span></div><div id="review-rows"></div>
    <button type="button" class="text-button" id="add-category">${icon("plus")}${t.addCategory}</button>
    <p class="replace-note">${icon("refresh-cw")}${t.replace}</p>
@@ -1000,8 +1000,11 @@ function showReview(result, raw = "") {
           .forEach((item) =>
             item.classList.toggle("selected", item === button),
           );
-        $(".bank-detection-note").textContent = t.bankPicker;
-        $(".bank-detection-note").classList.remove("bank-needs-choice");
+        const note = $(".bank-detection-note");
+        if (note) {
+          note.textContent = t.bankPicker;
+          note.classList.remove("bank-needs-choice");
+        }
       }),
   );
   function draw() {
@@ -1112,6 +1115,7 @@ function showReview(result, raw = "") {
             bankSource: result.bankSource,
           },
           raw,
+          { fromScreenshot },
         );
       $("#confirm-replace").onclick = save;
     } else save();
@@ -1164,7 +1168,7 @@ async function processImage(file) {
     if (thisJob !== job) return;
     busy = false;
     render();
-    showReview(result, result.text);
+    showReview(result, result.text, { fromScreenshot: true });
   } catch (error) {
     if (thisJob === job && error.name !== "AbortError") {
       busy = false;

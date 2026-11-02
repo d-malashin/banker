@@ -1,5 +1,11 @@
 # Banker
 
+## Manual bank-entry notice
+
+- [x] Make bank-recognition notices conditional on screenshot-origin review and preserve the origin when returning from replacement confirmation.
+- [x] Verify manual bank selection and screenshot warnings independently.
+- [ ] Push and deploy the correction.
+
 ## Real screenshot OCR, locale bank catalogs, and monthly history
 
 - [x] Reproduce OCR failures on the three provided originals and improve the actual recognition pipeline with spatial parsing and bank suggestions.

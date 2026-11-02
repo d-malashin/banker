@@ -1,5 +1,7 @@
 # Lessons
 
+- Shared manual-entry and OCR-review forms must retain their entry source explicitly. Missing bank/category data is normal during manual entry; screenshot-recognition warnings belong only to the screenshot flow, including after reopening a replacement review.
+
 - A personal utility should become a focused app after the first successful save. Persist that completion separately from whether data currently exists, and remove onboarding/marketing from the returning-user cabinet even after the last item is deleted. Keep appearance choices readable and follow device theme by default.
 
 - Keep bank identity marks inside the bank picker and saved lists. Do not turn the hero or landing preview into a row of bank advertisements; use restrained brand-inspired monograms when that direction is requested.
