@@ -1,4 +1,7 @@
+import { INTERNATIONAL_BANKS } from './international-banks.js';
+
 export const BANKS = [
+  ...INTERNATIONAL_BANKS,
   { id: 'tbank', name: 'Т-Банк', color: '#ffdc32', mark: 'Т', aliases: ['т-банк', 'т банк', 'тбанк', 'тинькофф', 'tinkoff', 't-bank', 'tbank'] },
   { id: 'sber', name: 'Сбер', color: '#35ba69', mark: 'С', aliases: ['сбер', 'сбербанк', 'sber', 'sberbank'] },
   { id: 'alfa', name: 'Альфа-Банк', color: '#ef4051', mark: 'А', aliases: ['альфа', 'альфа-банк', 'альфабанк', 'alfa', 'alfa-bank'] },

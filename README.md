@@ -2,7 +2,7 @@
 
 [Open Banker](https://d-malashin.github.io/banker/) · [Source repository](https://github.com/d-malashin/banker)
 
-A mobile-first, local-only cashback cabinet with a frosted-glass interface. Upload a screenshot of a Russian bank's cashback page, recognize its bank and categories on your own device, review the result, and save it. Russian browser locales get Russian interface text; other locales get English.
+A mobile-first, local-only cashback cabinet with a frosted-glass interface. Upload a cashback screenshot, recognize its categories locally, confirm the bank and month, and save it. Russian browser locales get Russian interface text; other locales get English.
 
 ## Run locally
 
@@ -29,10 +29,10 @@ The production build generates a versioned service worker with every application
 - No server, user account, database, analytics, or external OCR service.
 - Screenshots stay in browser memory and are processed locally with Tesseract.js. App files and OCR engines/models are loaded from the same static host.
 - Saved categories remain in browser storage. Clearing site data, private browsing sessions ending, or browser storage eviction can erase them. Export JSON backups when the list matters.
-- A bank has one category list. Saving a new screenshot for the same bank replaces its complete previous list after review. Other banks are retained.
-- OCR can miss text or assign a percentage incorrectly. Review and correct the result before saving. If a screenshot contains only a logo, select the bank manually. This is a category organizer, not a source of bank offer terms or activation status.
-- Export/import JSON moves data between devices. Imported banks replace matching banks and preserve other existing banks. Imports are validated before use.
-- Sharing encodes categories in the URL fragment (`#…`). The fragment is not sent in the normal HTTP request to GitHub Pages. Anyone with the full link can read those categories; a copied or forwarded link cannot be revoked. Share only the cashback information you intend to disclose. Screenshot pixels are never included.
+- Each bank has one complete category list per month. Saving a screenshot replaces only the selected bank and month. Other banks and months stay intact. The six newest populated months are retained; export a backup for longer history.
+- OCR can miss text or assign a percentage incorrectly. Review and correct the result before saving. If no bank identifier is visible, choosing a bank is required. Layout-based suggestions are explicitly labeled and editable; they are not certain identification. This is a category organizer, not a source of bank offer terms or activation status.
+- Export/import JSON moves data between devices. Imports replace matching bank/month lists and preserve other lists within the six-month retention window. Version 2 backups include every retained month. Legacy version 1 data and shared links migrate using each record’s local upload month; the original local v1 storage is left untouched as a fallback. Imports are validated before use.
+- Sharing includes only the selected month and encodes categories in the URL fragment (`#…`). The fragment is not sent in the normal HTTP request to GitHub Pages. Anyone with the full link can read those categories; a copied or forwarded link cannot be revoked. Share only the cashback information you intend to disclose. Screenshot pixels are never included.
 - Received shared lists appear separately below your own list. Opening a shared link never replaces your categories.
 
 ## Install on an iPhone
@@ -56,6 +56,28 @@ The frontend registers `sw.js` relative to its page URL. Its service worker post
 
 ## Appearance, bank marks and personal settings
 
-Banker uses a neutral gray canvas, translucent white controls, and small colored category/summary accents. Settings includes an optional display name that personalizes the greeting. It is stored separately on the current device and is excluded from JSON exports and shared links; leaving it blank restores the default greeting.
+Banker uses a neutral gray canvas, translucent neutral controls, and small colored category accents. After the first confirmed category (or imported data), a durable local marker switches to the compact cabinet permanently, even after the last category is deleted. The returning-user view contains the app header/settings, month selector, cashback controls/lists and a floating upload button; onboarding, marketing, summary tiles and footer are removed. Settings includes an optional display name that personalizes the greeting. It is stored separately on the current device and is excluded from JSON exports and shared links; leaving it blank removes the optional header name. Appearance settings offer System, Light and Dark. System uses `prefers-color-scheme` without extra permissions and responds to device appearance changes; explicit choices persist in the same local preference record. An early local script applies appearance before rendering to avoid a light flash in dark mode. Installation guidance and retention details remain accessible in settings.
 
-Ten locally bundled bank marks identify Sber, VTB, Gazprombank, Alfa-Bank, PSB, Rosselkhozbank, T-Bank, Bank DOM.RF, MKB, and Sovcombank. Selection follows the Interfax-100 Q3 2026 asset ranking, not a reliability recommendation. Original asset URLs, attribution, transformations, and file hashes are recorded in [public/banks/sources.json](public/banks/sources.json). The marks are served with the app and precached for offline use; no third-party logo service is contacted by the browser. Other supported or custom banks retain a letter badge.
+Bank identity marks in the saved lists and picker are simple, brand-inspired monograms. Original bank-logo images are not bundled or fetched. No bank marks appear in the hero or landing preview. Russian locales suggest Russian banks; other locales suggest a curated international retail-bank set (Chase, Bank of America, Citi, HSBC, Wells Fargo, Barclays, Santander, BNP Paribas, Deutsche Bank, Revolut). This is a convenience catalog, not a ranking. Any custom bank name is accepted.
+
+## Monthly history
+
+Use the global month selector to navigate saved lists. The current month is labeled; future and historical months have distinct markers. On opening Banker, the current month is preferred when it has data; otherwise the most recently uploaded month is shown. Saving a screenshot opens its selected month.
+
+The review form defaults to the current local month before the 25th and the next month from the 25th onward, including December/year rollover. You can change that month before saving. Deletion, replacement, import and sharing preserve month identity. A screenshot that would fall outside the six retained months is rejected with a clear message rather than claiming to save it and silently dropping it.
+
+## Screenshot recognition checks
+
+The OCR pipeline retains word coordinates, separates two-column cards, removes icon glyphs around category text, normalizes dark screenshots, and attempts a separate crop for tiny colored bank-label pills. It does not need larger models or a remote AI service. A required bank picker handles screens without any visible bank identity.
+
+`npm test` covers the pure parser, monthly data, locale catalog and validation. To replay the real screenshot regression locally, keep originals outside the repository and run:
+
+```sh
+node scripts/ocr-regression.mjs /path/to/cashbacks_screens
+```
+
+The directory is expected to contain `alfa.jpeg`, `sber.jpeg` and `t-bank.jpeg`. `--baseline` reproduces the old failures; the normal run checks exact selected category names/rates and honest bank-identification behavior. Those private source images and OCR output screenshots are never part of the app bundle or Git history.
+
+## Home-screen widget
+
+No native widget was added: the requested iOS/Android widget needs native platform components, which are outside a pure PWA. See the primary-source [widget research](tasks/widget-research.md). Home-screen PWA installation remains supported.

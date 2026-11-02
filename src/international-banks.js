@@ -1,0 +1,73 @@
+// A familiar international retail-bank selection, not an assets ranking.
+export const INTERNATIONAL_BANKS = [
+  {
+    id: "chase",
+    name: "Chase",
+    color: "#117aca",
+    mark: "C",
+    aliases: ["chase", "jpmorgan chase", "jp morgan chase"],
+  },
+  {
+    id: "bankofamerica",
+    name: "Bank of America",
+    color: "#e31837",
+    mark: "B",
+    aliases: ["bank of america", "bankofamerica", "bofa"],
+  },
+  {
+    id: "citi",
+    name: "Citi",
+    color: "#056dae",
+    mark: "C",
+    aliases: ["citi", "citibank", "citigroup"],
+  },
+  {
+    id: "hsbc",
+    name: "HSBC",
+    color: "#db0011",
+    mark: "H",
+    aliases: ["hsbc", "hongkong and shanghai banking"],
+  },
+  {
+    id: "wellsfargo",
+    name: "Wells Fargo",
+    color: "#d71e28",
+    mark: "W",
+    aliases: ["wells fargo", "wellsfargo"],
+  },
+  {
+    id: "barclays",
+    name: "Barclays",
+    color: "#00aeef",
+    mark: "B",
+    aliases: ["barclays", "barclaycard"],
+  },
+  {
+    id: "santander",
+    name: "Santander",
+    color: "#ec0000",
+    mark: "S",
+    aliases: ["santander", "banco santander"],
+  },
+  {
+    id: "bnpparibas",
+    name: "BNP Paribas",
+    color: "#00965e",
+    mark: "B",
+    aliases: ["bnp paribas", "bnpparibas"],
+  },
+  {
+    id: "deutschebank",
+    name: "Deutsche Bank",
+    color: "#0018a8",
+    mark: "D",
+    aliases: ["deutsche bank", "deutschebank"],
+  },
+  {
+    id: "revolut",
+    name: "Revolut",
+    color: "#191c1f",
+    mark: "R",
+    aliases: ["revolut"],
+  },
+];

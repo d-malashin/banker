@@ -1,5 +1,22 @@
 # Banker
 
+## Real screenshot OCR, locale bank catalogs, and monthly history
+
+- [x] Reproduce OCR failures on the three provided originals and improve the actual recognition pipeline with spatial parsing and bank suggestions.
+- [x] Show Russian bank suggestions for Russian locales and international banks for other locales; preserve custom bank names.
+- [x] Add versioned monthly data, six-month retention, safe legacy migration, and month-aware import/sharing/replacement.
+- [x] Add a global month selector and upload month field defaulting to next month from the 25th.
+- [x] Verify supplied screenshots, month navigation/replacement, locale catalogs, transfer/sharing, and offline use.
+- [ ] Push, deploy, and verify the published update.
+- [x] Persist completed onboarding and show only the app cabinet after the first confirmed category, including after deleting all categories.
+- [x] Replace strong blue controls with readable neutral glass and add persisted System/Light/Dark appearance settings.
+
+Agreed monthly behavior: one complete list per bank per YYYY-MM month; replace only the selected bank/month; retain the six newest populated month buckets. Prefer the current month if it has data, otherwise the most recently uploaded month. Saving switches to the uploaded month. Upload date before day25 defaults current month; day25 onward defaults next month, including year rollover. Bank suggestions remain editable, and uncertain layout-based matches are explicitly marked for confirmation. Original screenshots stay outside the repository and deployment.
+
+Verification: 35 automated tests pass. `node scripts/ocr-regression.mjs` and isolated Chromium both recognized all 12 selected categories/rates exactly from the three original screenshots, excluding Alfa promotions/unchecked offers. T-Bank's header crop recognizes its name; Alfa is explicitly a layout suggestion; unbranded Sber requires bank selection. Browser checks cover Russian/international suggestions, custom bank names, day24/day25 defaults, November/December navigation, replacement/deletion limited to one bank/month, v2 export/import, selected-month sharing, legacy migration, and offline OCR.
+
+Appearance/onboarding verification: a first confirmed category removes hero, marketing, summaries and footer. Deleting the last category and reloading preserves app mode. System theme follows emulated device changes; explicit Light/Dark persists across reload despite the device setting. Light/dark mobile cabinets were visually inspected; no horizontal overflow. Original bank images were removed from the bundle and replaced with monograms only inside saved lists/picker. No native widget was added per the research decision in `tasks/widget-research.md`.
+
 ## Neutral glass redesign, bank logos, and settings
 
 - [x] Source and bundle actual logos for ten leading Russian banks, with attribution.
