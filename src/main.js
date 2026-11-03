@@ -99,9 +99,14 @@ import {
   mergeLedger,
   ledgerMonths,
   selectInitialMonth,
-  encodeLedgerShare,
-  decodeLedgerShare,
 } from "./ledger.js";
+import {
+  createTransfer,
+  readTransfer,
+  encodeTransfer,
+  decodeTransfer,
+} from "./transfer.js";
+import { validateReceived, mergeReceived } from "./received.js";
 import "./style.css";
 
 const ru = navigator.language.toLowerCase().startsWith("ru");
@@ -504,6 +509,69 @@ Object.assign(copy.ru, {
   settingsHistory: "История",
   emptyMonthSub: "Добавьте скриншот, чтобы сохранить кешбэки за этот месяц.",
 });
+Object.assign(copy.en, {
+  namePrivacy:
+    "Your saved name is included in exported cashbacks and sharing links. It stays in your browser until you choose to share.",
+  shareText:
+    "This link contains this month’s cashbacks and your saved name, if set. Anyone with the link can read them. Screenshots are not included.",
+  importTitle: "Import cashbacks?",
+  ownerName: "Person’s name",
+  ownerPlaceholder: "Name this person’s cashback list",
+  unnamedOwner: "Unnamed person",
+  importDestination: "Import into",
+  importOwn: "My cashbacks — restore a backup",
+  importNew: "A separate shared list",
+  importOtherHint:
+    "Saved below your own lists, with the original months. Your cashbacks stay unchanged.",
+  importOwnHint:
+    "Restores your backup. Matching banks and months are replaced; your profile name stays unchanged.",
+  importNameHint:
+    "Use the sender’s name, or choose a name for an unnamed list.",
+  saveShared: "Save to app",
+  receivedSaved: "Shared cashbacks saved",
+  rename: "Edit name",
+  renameTitle: "Name this cashback list",
+  removeList: "Remove list",
+  removeListTitle: "Remove this shared list?",
+  removeListText:
+    "This removes this person’s saved cashbacks from this device.",
+  receivedSection: "Shared cashbacks",
+  exportPerson: "Export this person’s cashbacks",
+  savedListsHint: "Saved on this device",
+  previewHint: "Shared link preview",
+  invalidOwnerName: "Use a name of up to 60 characters.",
+});
+Object.assign(copy.ru, {
+  namePrivacy:
+    "Сохранённое имя попадает в экспорт кешбэков и ссылки для друзей. До отправки данные остаются в браузере.",
+  shareText:
+    "Ссылка содержит кешбэки выбранного месяца и ваше имя, если оно указано. Любой получатель сможет их прочитать. Скриншоты в ссылку не входят.",
+  importTitle: "Импортировать кешбэки?",
+  ownerName: "Имя владельца",
+  ownerPlaceholder: "Как назвать список этого человека?",
+  unnamedOwner: "Без имени",
+  importDestination: "Куда импортировать",
+  importOwn: "Мои кешбэки — восстановить копию",
+  importNew: "Отдельный общий список",
+  importOtherHint:
+    "Сохранится под вашими списками с исходными месяцами. Ваши кешбэки останутся без изменений.",
+  importOwnHint:
+    "Восстановит вашу копию. Совпавшие банки и месяцы заменятся, имя в настройках не изменится.",
+  importNameHint:
+    "Используйте имя отправителя или назовите список без имени самостоятельно.",
+  saveShared: "Сохранить в приложение",
+  receivedSaved: "Общие кешбэки сохранены",
+  rename: "Изменить имя",
+  renameTitle: "Имя владельца кешбэков",
+  removeList: "Убрать список",
+  removeListTitle: "Убрать общий список?",
+  removeListText: "Кешбэки этого человека будут удалены с этого устройства.",
+  receivedSection: "Общие кешбэки",
+  exportPerson: "Экспортировать кешбэки этого человека",
+  savedListsHint: "Сохранено на устройстве",
+  previewHint: "Предпросмотр ссылки",
+  invalidOwnerName: "Укажите имя длиной до 60 символов.",
+});
 const t = copy[ru ? "ru" : "en"];
 let displayName = "";
 let themePreference = window.BankerTheme?.preference() || "system";
@@ -562,6 +630,8 @@ const refreshIcons = () =>
 const uid = () => crypto.randomUUID();
 let banks = [],
   shared = [],
+  sharedOwnerName = "",
+  received = [],
   view = "bank",
   query = "",
   busy = false,
@@ -590,12 +660,31 @@ try {
   saveUnavailable = true;
 }
 try {
-  if (location.hash.startsWith("#share="))
-    shared = decodeLedgerShare(location.hash);
+  const savedReceived = localStorage.getItem("banker.received.v1");
+  if (savedReceived)
+    received = validateReceived(JSON.parse(savedReceived)).collections;
+  if (
+    received.some((person) =>
+      person.banks.some((bank) => bank.categories.length),
+    )
+  )
+    completedLoop = true;
+} catch {
+  saveUnavailable = true;
+}
+try {
+  if (location.hash.startsWith("#share=")) {
+    const transfer = decodeTransfer(location.hash);
+    shared = transfer.banks;
+    sharedOwnerName = transfer.ownerName;
+  }
 } catch {
   queueMicrotask(() => toast(t.shareInvalid));
 }
-let selectedMonth = selectInitialMonth(banks.length ? banks : shared);
+const receivedBanks = () => received.flatMap((person) => person.banks);
+let selectedMonth = selectInitialMonth(
+  banks.length ? banks : [...shared, ...receivedBanks()],
+);
 const suggestedBanks = getSuggestedBanks(navigator.language);
 const monthName = (month) =>
   new Date(
@@ -615,6 +704,7 @@ const availableMonths = () =>
       selectedMonth,
       ...ledgerMonths(banks),
       ...ledgerMonths(shared),
+      ...ledgerMonths(receivedBanks()),
     ]),
   ]
     .sort()
@@ -638,6 +728,27 @@ function persist(next) {
     completedLoop =
       completedLoop || next.some((bank) => bank.categories.length);
     if (completedLoop) {
+      try {
+        localStorage.setItem("banker.onboarded", "1");
+      } catch {}
+    }
+    return true;
+  } catch {
+    toast(t.storageError);
+    return false;
+  }
+}
+function persistReceived(next) {
+  try {
+    const normalized = validateReceived({ version: 1, collections: next });
+    localStorage.setItem("banker.received.v1", JSON.stringify(normalized));
+    received = normalized.collections;
+    if (
+      received.some((person) =>
+        person.banks.some((bank) => bank.categories.length),
+      )
+    ) {
+      completedLoop = true;
       try {
         localStorage.setItem("banker.onboarded", "1");
       } catch {}
@@ -684,10 +795,10 @@ function categoryIcon(name) {
   if (/путеше|travel/i.test(name)) return "plane";
   return "shopping-bag";
 }
-function categoryRow(category, bank, isShared = false) {
-  return `<div class="category-row"><span class="category-icon" data-type="${categoryIcon(category.name)}">${icon(categoryIcon(category.name))}</span><div class="category-info"><span>${esc(category.name)}</span>${view !== "bank" ? `<small class="category-bank">${badge(bank, true)}<span>${esc(bank.name)}</span></small>` : ""}</div><strong class="rate">${category.rate}<span>%</span></strong><button class="row-delete icon-button" data-delete="${esc(category.id)}" data-bank="${esc(bank.id)}" data-month="${esc(bank.month)}" data-shared="${isShared}" aria-label="${t.delete}: ${esc(category.name)}">${icon("x")}</button></div>`;
+function categoryRow(category, bank, isShared = false, receivedId = "") {
+  return `<div class="category-row"><span class="category-icon" data-type="${categoryIcon(category.name)}">${icon(categoryIcon(category.name))}</span><div class="category-info"><span>${esc(category.name)}</span>${view !== "bank" ? `<small class="category-bank">${badge(bank, true)}<span>${esc(bank.name)}</span></small>` : ""}</div><strong class="rate">${category.rate}<span>%</span></strong><button class="row-delete icon-button" data-delete="${esc(category.id)}" data-bank="${esc(bank.id)}" data-month="${esc(bank.month)}" data-shared="${isShared}" data-received="${esc(receivedId)}" aria-label="${t.delete}: ${esc(category.name)}">${icon("x")}</button></div>`;
 }
-function collection(items, isShared = false) {
+function collection(items, isShared = false, receivedId = "") {
   const filtered = items
     .map((b) => ({
       ...b,
@@ -706,14 +817,19 @@ function collection(items, isShared = false) {
         ? b.c.rate - a.c.rate
         : a.c.name.localeCompare(b.c.name, ru ? "ru" : "en"),
     );
-    return `<div class="bank-card glass ungrouped">${rows.map(({ c, b }) => categoryRow(c, b, isShared)).join("")}</div>`;
+    return `<div class="bank-card glass ungrouped">${rows.map(({ c, b }) => categoryRow(c, b, isShared, receivedId)).join("")}</div>`;
   }
   return filtered
     .map(
       (bank) =>
-        `<article class="bank-card glass"><header class="bank-card-header">${badge(bank)}<div><h3>${esc(bank.name)}</h3><small>${bank.categories.length} ${noun(bank.categories.length, "categories")}</small></div><span class="bank-dots">${icon("badge-check")}</span></header><div>${bank.categories.map((c) => categoryRow(c, bank, isShared)).join("")}</div><footer>${icon("clock-3")} ${t.updated} ${new Date(bank.updatedAt).toLocaleDateString(ru ? "ru-RU" : "en-GB", { day: "numeric", month: "short" })}</footer></article>`,
+        `<article class="bank-card glass"><header class="bank-card-header">${badge(bank)}<div><h3>${esc(bank.name)}</h3><small>${bank.categories.length} ${noun(bank.categories.length, "categories")}</small></div><span class="bank-dots">${icon("badge-check")}</span></header><div>${bank.categories.map((c) => categoryRow(c, bank, isShared, receivedId)).join("")}</div><footer>${icon("clock-3")} ${t.updated} ${new Date(bank.updatedAt).toLocaleDateString(ru ? "ru-RU" : "en-GB", { day: "numeric", month: "short" })}</footer></article>`,
     )
     .join("");
+}
+function receivedMarkup() {
+  const people = received.filter((person) => monthBanks(person.banks).length);
+  if (!people.length) return "";
+  return `<section class="received-section shared-section"><h2>${t.receivedSection}</h2>${people.map((person) => `<article class="received-person" data-person="${esc(person.id)}"><header class="section-top"><div><div class="section-kicker">${t.savedListsHint}</div><h3>${esc(person.name || t.unnamedOwner)}</h3></div><div class="actions"><button class="glass-button" data-rename-person="${esc(person.id)}" aria-label="${t.rename}" title="${t.rename}">${icon("user-round")}<span>${t.rename}</span></button><button class="glass-button" data-export-person="${esc(person.id)}" aria-label="${t.exportPerson}" title="${t.exportPerson}">${icon("upload")}</button><button class="glass-button" data-remove-person="${esc(person.id)}" aria-label="${t.removeList}" title="${t.removeList}">${icon("x")}</button></div></header><div class="bank-grid">${collection(monthBanks(person.banks), true, person.id)}</div></article>`).join("")}</section>`;
 }
 function render() {
   const activeBanks = monthBanks(banks);
@@ -775,7 +891,7 @@ function render() {
     </div>
     <div id="processing" class="processing glass" ${busy ? "" : "hidden"}><div class="spinner"></div><div><strong>${t.processing}</strong><p id="progress-text">${t.loading}</p><progress id="progress" max="100" value="0"></progress></div><button class="text-button" id="cancel-ocr">${t.cancel}</button></div>
     ${
-      hasData || shared.length || completedLoop
+      hasData || shared.length || received.length || completedLoop
         ? `<div class="toolbar"><label class="search-box">${icon("search")}<input type="search" id="search" value="${esc(query)}" aria-label="${t.search}" placeholder="${t.search}"></label><label class="select-wrap">${icon("sliders-horizontal")}<select id="view" aria-label="${ru ? "Сортировка" : "Sort categories"}"><option value="bank" ${view === "bank" ? "selected" : ""}>${t.byBank}</option><option value="rate" ${view === "rate" ? "selected" : ""}>${t.highest}</option><option value="az" ${view === "az" ? "selected" : ""}>${t.az}</option></select>${icon("chevron-down")}</label></div><div class="bank-grid" id="own-list">${activeBanks.length ? collection(activeBanks) : `<div class="empty-month"><h3>${t.emptyMonth}</h3><p>${t.emptyMonthSub}</p><button class="text-button" data-manual>${t.manual}${icon("plus")}</button></div>`}</div>`
         : `
     <div class="empty-layout"><div class="empty-message"><span class="empty-icon">${icon("layers-2")}</span><h3>${t.empty}</h3><p>${t.emptySub}</p><button class="text-button" data-manual>${t.manual}${icon("arrow-right")}</button></div>
@@ -795,7 +911,8 @@ function render() {
     </div>`
     }
    </section>
-   ${shared.length ? `<section class="shared-section"><div class="section-top"><div><div class="section-kicker">${icon("link")} ${ru ? "ПО ССЫЛКЕ" : "FROM A FRIEND"}</div><h2>${t.shared}</h2><p>${t.sharedSub}</p></div><button class="glass-button" id="dismiss-shared">${icon("x")}${t.dismiss}</button></div><div class="bank-grid">${activeShared.length ? collection(activeShared, true) : `<p class="no-results">${t.noSharedMonth}</p>`}</div></section>` : ""}
+   ${shared.length ? `<section class="shared-section shared-preview"><div class="section-top"><div><div class="section-kicker">${t.previewHint}</div><h2>${esc(sharedOwnerName || t.shared)}</h2><p>${t.sharedSub}</p></div><div class="actions shared-preview-actions"><button class="glass-button" id="save-shared">${icon("download")}${t.saveShared}</button><button class="glass-button" id="dismiss-shared" aria-label="${t.dismiss}">${icon("x")}</button></div></div><div class="bank-grid">${activeShared.length ? collection(activeShared, true) : `<p class="no-results">${t.noSharedMonth}</p>`}</div></section>` : ""}
+   <div id="received-lists">${receivedMarkup()}</div>
    ${
      !completedLoop
        ? `   <section class="how-section"><div class="how-title"><span>${t.how}</span><span>01 — 03</span></div><div class="steps">${[
@@ -861,16 +978,22 @@ function render() {
       query = event.target.value;
       $("#own-list").innerHTML = collection(monthBanks(banks));
       if (shared.length)
-        $(".shared-section .bank-grid").innerHTML = collection(
+        $(".shared-preview .bank-grid").innerHTML = collection(
           monthBanks(shared),
           true,
         );
+      $("#received-lists").innerHTML = receivedMarkup();
       refreshIcons();
       bindDeletes();
+      bindReceivedActions();
     };
+  if ($("#save-shared"))
+    $("#save-shared").onclick = () =>
+      showImport(createTransfer(shared, sharedOwnerName), true);
   if ($("#dismiss-shared"))
     $("#dismiss-shared").onclick = () => {
       shared = [];
+      sharedOwnerName = "";
       history.replaceState(null, "", location.pathname + location.search);
       render();
     };
@@ -889,6 +1012,7 @@ function render() {
     };
   }
   bindDeletes();
+  bindReceivedActions();
 }
 function showSettings() {
   dialog(
@@ -943,14 +1067,25 @@ function bindDeletes() {
                   : b,
               )
               .filter((b) => b.categories.length);
-          if (isShared) {
+          if (button.dataset.received) {
+            const next = received
+              .map((person) =>
+                person.id === button.dataset.received
+                  ? { ...person, banks: remove(person.banks) }
+                  : person,
+              )
+              .filter((person) => person.banks.length);
+            if (!persistReceived(next)) return;
+          } else if (isShared) {
             shared = remove(shared);
             history.replaceState(
               null,
               "",
               location.pathname +
                 location.search +
-                (shared.length ? `#share=${encodeLedgerShare(shared)}` : ""),
+                (shared.length
+                  ? `#share=${encodeTransfer(shared, sharedOwnerName)}`
+                  : ""),
             );
           } else if (!persist(remove(banks))) return;
           $("#modal").close();
@@ -1183,51 +1318,166 @@ async function processImage(file) {
     if (ocrController === controller) ocrController = null;
   }
 }
-function exportData() {
-  if (!banks.length) {
+function downloadTransfer(records, ownerName = "") {
+  if (!records.length) {
     toast(t.emptyShare);
     return;
   }
-  const blob = new Blob([JSON.stringify({ version: 2, banks }, null, 2)], {
-    type: "application/json",
-  });
+  const blob = new Blob(
+    [JSON.stringify(createTransfer(records, ownerName), null, 2)],
+    { type: "application/json" },
+  );
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `banker-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `banker-${new Date().toISOString().slice(0, 10)}.json`;
+  anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   toast(t.exportDone);
+}
+function exportData() {
+  downloadTransfer(banks, displayName);
 }
 async function importFile(file) {
   if (file.size > 1024 * 1024) {
     toast(t.badFile);
     return;
   }
-  let data;
   try {
-    data = validateLedger(JSON.parse(await file.text()));
+    const data = readTransfer(JSON.parse(await file.text()));
     if (!data.banks.length) throw Error();
+    showImport(data);
   } catch {
     toast(t.badFile);
-    return;
   }
+}
+function showImport(data, fromLink = false) {
+  const defaultTarget = "new";
   dialog(
-    `<div class="modal-symbol">${icon("download")}</div><h2>${t.importTitle}</h2><p>${new Set(data.banks.map((bank) => bank.id)).size} ${t.bankStat.toLocaleLowerCase()} · ${ledgerMonths(data.banks).length} ${t.monthCount}</p><p>${t.importText}</p><div class="modal-actions"><button class="glass-button" id="cancel-import">${t.cancel}</button><button class="primary" id="confirm-import">${t.confirmImport}</button></div>`,
+    `<div class="modal-symbol">${icon("download")}</div><h2>${t.importTitle}</h2><p>${ledgerMonths(data.banks).map(monthName).join(" · ")}</p><form id="import-form"><label class="field" for="import-target">${t.importDestination}<select id="import-target" class="theme-picker"><option value="own" ${defaultTarget === "own" ? "selected" : ""}>${t.importOwn}</option><option value="new" ${defaultTarget === "new" ? "selected" : ""}>${t.importNew}</option>${received.map((person) => `<option value="${esc(person.id)}" ${defaultTarget === person.id ? "selected" : ""}>${esc(person.name || t.unnamedOwner)}</option>`).join("")}</select></label><div id="import-owner-field"><label class="field" for="import-owner-name"><span>${t.ownerName}<small>${t.optional}</small></span><input id="import-owner-name" maxlength="60" value="${esc(data.ownerName)}" placeholder="${t.ownerPlaceholder}"></label><p class="field-hint">${t.importNameHint}</p></div><p id="import-hint"></p><p id="import-error" class="form-error" role="alert"></p><div class="modal-actions"><button type="button" class="glass-button" id="cancel-import">${t.cancel}</button><button type="submit" class="primary" id="confirm-import">${t.confirmImport}</button></div></form>`,
   );
+  const updateTarget = () => {
+    const target = $("#import-target").value;
+    $("#import-owner-field").hidden = target === "own";
+    $("#import-hint").textContent =
+      (target === "own" ? t.importOwnHint : t.importOtherHint) +
+      " " +
+      t.retention;
+    if (target !== "own" && target !== "new")
+      $("#import-owner-name").value =
+        received.find((person) => person.id === target)?.name || data.ownerName;
+  };
+  $("#import-target").onchange = updateTarget;
+  updateTarget();
   $("#cancel-import").onclick = () => $("#modal").close();
-  $("#confirm-import").onclick = () => {
+  $("#import-form").onsubmit = (event) => {
+    event.preventDefault();
+    const target = $("#import-target").value;
+    const name = $("#import-owner-name").value.trim().replace(/\s+/gu, " ");
+    if (name.length > 60) {
+      $("#import-error").textContent = t.invalidOwnerName;
+      return;
+    }
     try {
-      if (persist(mergeLedger(banks, data.banks))) {
-        $("#modal").close();
-        selectedMonth = selectInitialMonth(banks);
-        render();
-        toast(t.imported);
+      let importedRecords;
+      let success;
+      if (target === "own") {
+        success = persist(mergeLedger(banks, data.banks));
+        importedRecords = banks;
+      } else {
+        const next = mergeReceived(received, {
+          ...(target === "new" ? {} : { id: target }),
+          name,
+          banks: data.banks,
+        });
+        importedRecords = (
+          target === "new"
+            ? next.at(-1)
+            : next.find((person) => person.id === target)
+        ).banks;
+        success = persistReceived(next);
       }
+      if (!success) return;
+      if (fromLink) {
+        shared = [];
+        sharedOwnerName = "";
+        history.replaceState(null, "", location.pathname + location.search);
+      }
+      const incomingMonth = selectInitialMonth(data.banks);
+      selectedMonth =
+        target !== "own" &&
+        importedRecords.some((bank) => bank.month === incomingMonth)
+          ? incomingMonth
+          : selectInitialMonth(importedRecords);
+      query = "";
+      $("#modal").close();
+      render();
+      toast(target === "own" ? t.imported : t.receivedSaved);
     } catch {
-      toast(t.badFile);
+      $("#import-error").textContent = t.badFile;
     }
   };
+}
+function bindReceivedActions() {
+  document.querySelectorAll("[data-rename-person]").forEach(
+    (button) =>
+      (button.onclick = () => {
+        const person = received.find(
+          (item) => item.id === button.dataset.renamePerson,
+        );
+        dialog(
+          `<div class="modal-symbol">${icon("user-round")}</div><h2>${t.renameTitle}</h2><form id="rename-form"><label class="field" for="received-name">${t.ownerName}<input id="received-name" maxlength="60" value="${esc(person.name)}" placeholder="${t.ownerPlaceholder}"></label><p id="rename-error" class="form-error" role="alert"></p><button class="primary wide" type="submit">${t.saveSettings}</button></form>`,
+        );
+        $("#rename-form").onsubmit = (event) => {
+          event.preventDefault();
+          const name = $("#received-name").value.trim().replace(/\s+/gu, " ");
+          if (name.length > 60) {
+            $("#rename-error").textContent = t.invalidOwnerName;
+            return;
+          }
+          if (
+            persistReceived(
+              received.map((item) =>
+                item.id === person.id ? { ...item, name } : item,
+              ),
+            )
+          ) {
+            $("#modal").close();
+            render();
+          }
+        };
+      }),
+  );
+  document.querySelectorAll("[data-export-person]").forEach(
+    (button) =>
+      (button.onclick = () => {
+        const person = received.find(
+          (item) => item.id === button.dataset.exportPerson,
+        );
+        downloadTransfer(person.banks, person.name);
+      }),
+  );
+  document.querySelectorAll("[data-remove-person]").forEach(
+    (button) =>
+      (button.onclick = () => {
+        dialog(
+          `<div class="modal-symbol">${icon("trash-2")}</div><h2>${t.removeListTitle}</h2><p>${t.removeListText}</p><div class="modal-actions"><button class="glass-button" id="keep-list">${t.cancel}</button><button class="primary danger" id="remove-list">${t.confirm}</button></div>`,
+        );
+        $("#keep-list").onclick = () => $("#modal").close();
+        $("#remove-list").onclick = () => {
+          if (
+            persistReceived(
+              received.filter(
+                (person) => person.id !== button.dataset.removePerson,
+              ),
+            )
+          ) {
+            $("#modal").close();
+            render();
+          }
+        };
+      }),
+  );
 }
 function shareData() {
   const activeBanks = monthBanks(banks);
@@ -1237,7 +1487,7 @@ function shareData() {
   }
   let url;
   try {
-    const payload = encodeLedgerShare(activeBanks);
+    const payload = encodeTransfer(activeBanks, displayName);
     url = `${location.origin}${location.pathname}${location.search}#share=${payload}`;
     if (url.length > 16000) throw Error();
   } catch {
@@ -1281,16 +1531,32 @@ window.addEventListener("offline", () => {
 });
 window.addEventListener("hashchange", () => {
   try {
-    shared = location.hash.startsWith("#share=")
-      ? decodeLedgerShare(location.hash)
-      : [];
-    selectedMonth = selectInitialMonth(banks.length ? banks : shared);
+    const data = location.hash.startsWith("#share=")
+      ? decodeTransfer(location.hash)
+      : createTransfer([]);
+    shared = data.banks;
+    sharedOwnerName = data.ownerName;
+    selectedMonth = selectInitialMonth(
+      banks.length ? banks : [...shared, ...receivedBanks()],
+    );
     render();
   } catch {
     toast(t.shareInvalid);
   }
 });
 window.addEventListener("storage", (e) => {
+  if (e.key === "banker.received.v1") {
+    try {
+      received = e.newValue
+        ? validateReceived(JSON.parse(e.newValue)).collections
+        : [];
+      if (received.some((person) => person.banks.length)) completedLoop = true;
+      render();
+    } catch {
+      toast(t.badFile);
+    }
+    return;
+  }
   if (e.key === "banker.preferences.v1") {
     try {
       const p = JSON.parse(e.newValue || "{}");

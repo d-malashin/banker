@@ -1,5 +1,17 @@
 # Banker
 
+## Sender names and month-preserving imports
+
+- [x] Add backward-compatible sender-name metadata to exported JSON and shared links while preserving explicit YYYY-MM values.
+- [x] Add import destination/name fields and a save-to-app action for received links.
+- [x] Store received people separately from personal bank/month records; support multiple months, rename, export and deletion.
+- [x] Verify named/unnamed JSON and links, month retention, personal-list isolation and persistence.
+- [ ] Commit, push, and verify the deployment triggered by the push.
+
+Transfer behavior: export personal retained history with the settings name; share only the selected month with that name. Import offers personal backup restoration or a separate received list. For received lists, the sender name is prefilled when present and can be supplied/edited when absent. All v2 months remain explicit and unchanged. Existing v1/v2 unnamed files/links remain supported. Received lists persist independently below personal cashbacks and participate in the global month selector.
+
+Verification: 45 automated tests pass. Isolated Chromium sender/recipient contexts verified that actual share links contain the settings name and December month, while exports contain the same name and both November/December. Importing and naming received lists preserves personal categories for the same bank/month. Explicitly updating an existing person preserves their other months. Renaming, per-person export, deletion, personal-backup restoration and reload persistence were checked. An unnamed legacy v2 link was named during Russian-language import and remained in December after an offline reload. Text escaping, dark mobile UI and no overflow at 320/390px were verified. Imports always default to a new separate list; a name match never silently selects an overwrite target.
+
 ## Manual bank-entry notice
 
 - [x] Make bank-recognition notices conditional on screenshot-origin review and preserve the origin when returning from replacement confirmation.

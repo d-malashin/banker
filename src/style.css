@@ -2593,3 +2593,56 @@ body:has(.app-mode) #toast {
     padding: 11px 9px;
   }
 }
+
+.received-section > h2 {
+  margin-bottom: 24px;
+}
+.received-person {
+  margin: 24px 0 32px;
+}
+.received-person > header {
+  margin-bottom: 16px;
+}
+.received-person h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  overflow-wrap: anywhere;
+}
+.received-person .section-top > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+.shared-preview .section-top > div:first-child {
+  min-width: 0;
+}
+.shared-preview h2 {
+  overflow-wrap: anywhere;
+}
+#import-hint {
+  font-size: 12px;
+  line-height: 1.7;
+}
+#received-lists:empty {
+  display: none;
+}
+@media (max-width: 650px) {
+  .received-person h3 {
+    font-size: 19px;
+  }
+  .received-person .actions {
+    flex-shrink: 0;
+  }
+  .received-section > h2 {
+    font-size: 21px;
+  }
+  .shared-preview-actions #save-shared {
+    width: auto;
+    padding: 10px 13px;
+    font-size: 12px;
+  }
+  .shared-preview-actions {
+    max-width: 100%;
+  }
+}
